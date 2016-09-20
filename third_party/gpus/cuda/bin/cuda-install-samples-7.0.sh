@@ -1,0 +1,1 @@
+/usr/local/cuda/bin/cuda-install-samples-7.0.sh
