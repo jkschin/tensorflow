@@ -380,6 +380,19 @@ Status PosixFileSystem::GetFileSize(const string& fname, uint64* size) {
   return s;
 }
 
+Status PosixFileSystem::Stat(const string& fname, FileStatistics* stats) {
+  Status s;
+  struct stat sbuf;
+  if (stat(TranslateName(fname).c_str(), &sbuf) != 0) {
+    s = IOError(fname, errno);
+  } else {
+    stats->length = sbuf.st_size;
+    stats->mtime_nsec = sbuf.st_mtime * 1e9;
+    stats->is_directory = S_ISDIR(sbuf.st_mode);
+  }
+  return s;
+}
+
 Status PosixFileSystem::RenameFile(const string& src, const string& target) {
   Status result;
   if (rename(TranslateName(src).c_str(), TranslateName(target).c_str()) != 0) {

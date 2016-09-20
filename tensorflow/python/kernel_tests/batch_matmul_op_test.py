@@ -71,8 +71,8 @@ class BatchMatmulOpTest(tf.test.TestCase):
 
   # Compares _tfpBatchMatmul(x, y, alpha, adj) and _npBatchMatMul(x, y, alpha,
   # adj)
-  def _compare(self, x, y, adj_x, adj_y, use_gpu=False):
-    with self.test_session(use_gpu=use_gpu):
+  def _compare(self, x, y, adj_x, adj_y):
+    with self.test_session(use_gpu=True):
       z0 = tf.batch_matmul(x, y, adj_x=adj_x, adj_y=adj_y)
       z0_val = z0.eval()
     z1 = self._npBatchMatmul(x, y, adj_x, adj_y)
@@ -88,37 +88,34 @@ class BatchMatmulOpTest(tf.test.TestCase):
     return np.array(vals, dtype=np.float32)
 
   def testSimpleFloat(self):
-    for use_gpu in [False, True]:
-      self._compare(self._randFloat([7, 2, 3]), self._randFloat([7, 3, 5]),
-                    False, False, use_gpu)
-      self._compare(self._randFloat([7, 2, 3]), self._randFloat([7, 5, 3]),
-                    False, True, use_gpu)
-      self._compare(self._randFloat([7, 3, 2]), self._randFloat([7, 3, 5]),
-                    True, False, use_gpu)
-      self._compare(self._randFloat([7, 3, 2]), self._randFloat([7, 5, 3]),
-                    True, True, use_gpu)
+    self._compare(self._randFloat([7, 2, 3]), self._randFloat([7, 3, 5]),
+                  False, False)
+    self._compare(self._randFloat([7, 2, 3]), self._randFloat([7, 5, 3]),
+                  False, True)
+    self._compare(self._randFloat([7, 3, 2]), self._randFloat([7, 3, 5]),
+                  True, False)
+    self._compare(self._randFloat([7, 3, 2]), self._randFloat([7, 5, 3]),
+                  True, True)
 
   def testLargeFloat(self):
-    for use_gpu in [False, True]:
-      self._compare(self._randFloat([10, 64, 75]),
-                    self._randFloat([10, 75, 30]), False, False, use_gpu)
-      self._compare(self._randFloat([10, 75, 64]),
-                    self._randFloat([10, 75, 30]), True, False, use_gpu)
-      self._compare(self._randFloat([10, 64, 75]),
-                    self._randFloat([10, 30, 75]), False, True, use_gpu)
-      self._compare(self._randFloat([10, 75, 64]),
-                    self._randFloat([10, 30, 75]), True, True, use_gpu)
+    self._compare(self._randFloat([10, 64, 75]),
+                  self._randFloat([10, 75, 30]), False, False)
+    self._compare(self._randFloat([10, 75, 64]),
+                  self._randFloat([10, 75, 30]), True, False)
+    self._compare(self._randFloat([10, 64, 75]),
+                  self._randFloat([10, 30, 75]), False, True)
+    self._compare(self._randFloat([10, 75, 64]),
+                  self._randFloat([10, 30, 75]), True, True)
 
   def testHighNDims(self):
-    for use_gpu in [False, True]:
-      self._compare(self._randFloat([5, 7, 2, 3]),
-                    self._randFloat([5, 7, 3, 5]), False, False, use_gpu)
-      self._compare(self._randFloat([5, 7, 3, 2]),
-                    self._randFloat([5, 7, 3, 5]), True, False, use_gpu)
-      self._compare(self._randFloat([5, 7, 2, 3]),
-                    self._randFloat([5, 7, 5, 3]), False, True, use_gpu)
-      self._compare(self._randFloat([5, 7, 3, 2]),
-                    self._randFloat([5, 7, 5, 3]), True, True, use_gpu)
+    self._compare(self._randFloat([5, 7, 2, 3]),
+                  self._randFloat([5, 7, 3, 5]), False, False)
+    self._compare(self._randFloat([5, 7, 3, 2]),
+                  self._randFloat([5, 7, 3, 5]), True, False)
+    self._compare(self._randFloat([5, 7, 2, 3]),
+                  self._randFloat([5, 7, 5, 3]), False, True)
+    self._compare(self._randFloat([5, 7, 3, 2]),
+                  self._randFloat([5, 7, 5, 3]), True, True)
 
   # Returns a random complex numpy array of "shape".
   def _randComplex(self, shape):
@@ -139,8 +136,7 @@ class BatchMatmulOpTest(tf.test.TestCase):
 
   def testLargeComplex(self):
     self._compare(self._randComplex([10, 64, 75]),
-                  self._randComplex([10, 75, 30]), False,
-                  False)
+                  self._randComplex([10, 75, 30]), False, False)
     self._compare(self._randComplex([10, 64, 75]),
                   self._randComplex([10, 30, 75]), False, True)
     self._compare(self._randComplex([10, 75, 64]),
@@ -166,7 +162,7 @@ class BatchMatmulGradientTest(tf.test.TestCase):
   def _checkGrad(self, x, y, adj_x, adj_y):
     assert 3 == x.ndim
     assert 3 == y.ndim
-    with self.test_session():
+    with self.test_session(use_gpu=True):
       inx = tf.convert_to_tensor(x)
       iny = tf.convert_to_tensor(y)
       z = tf.batch_matmul(inx, iny, adj_x, adj_y)
