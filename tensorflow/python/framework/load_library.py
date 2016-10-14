@@ -23,8 +23,6 @@ import imp
 import sys
 import threading
 
-from six.moves.builtins import bytes  # pylint: disable=redefined-builtin
-
 from tensorflow.core.framework import op_def_pb2
 from tensorflow.core.lib.core import error_codes_pb2
 from tensorflow.python import pywrap_tensorflow as py_tf
@@ -39,7 +37,7 @@ def load_op_library(library_filename):
   loading a library. The rules for determining the exact location of the
   library are platform-specific and are not documented here. When the
   library is loaded, ops and kernels registered in the library via the
-  REGISTER_* macros are made available in the TensorFlow process. Note
+  `REGISTER_*` macros are made available in the TensorFlow process. Note
   that ops with the same name as an existing op are rejected and not
   registered with the process.
 

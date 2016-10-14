@@ -39,7 +39,7 @@ Instructions for updating:
     labels: `int64` `Tensor` or `SparseTensor` with shape
       [D1, ... DN, num_labels], where N >= 1 and num_labels is the number of
       target classes for the associated prediction. Commonly, N=1 and `labels`
-      has shape [batch_size, num_labels]. [D1, ... DN] must match `labels`.
+      has shape [batch_size, num_labels]. [D1, ... DN] must match `predictions`.
       Values should be in range [0, num_classes], where num_classes is the last
       dimension of `predictions`.
     k: Integer, k for @k metric.
@@ -54,7 +54,7 @@ Instructions for updating:
       be added to.
     updates_collections: An optional list of collections that updates should
       be added to.
-    name: Name of new update operation, and namespace for other dependant ops.
+    name: Name of new update operation, and namespace for other dependent ops.
 
   Returns:
     recall: Scalar `float64` `Tensor` with the value of `true_positives` divided

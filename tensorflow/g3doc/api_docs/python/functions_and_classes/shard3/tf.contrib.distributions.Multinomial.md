@@ -73,12 +73,13 @@ Initialize a batch of Multinomial distributions.
 *  <b>`logits`</b>: Floating point tensor representing the log-odds of a
     positive event with shape broadcastable to `[N1,..., Nm, k], m >= 0`,
     and the same dtype as `n`. Defines this as a batch of `N1 x ... x Nm`
-    different `k` class Multinomial distributions.
+    different `k` class Multinomial distributions. Only one of `logits` or
+    `p` should be passed in.
 *  <b>`p`</b>: Positive floating point tensor with shape broadcastable to
     `[N1,..., Nm, k]` `m >= 0` and same dtype as `n`.  Defines this as
     a batch of `N1 x ... x Nm` different `k` class Multinomial
     distributions. `p`'s components in the last portion of its shape should
-    sum up to 1.
+    sum up to 1. Only one of `logits` or `p` should be passed in.
 *  <b>`validate_args`</b>: `Boolean`, default `False`.  Whether to assert valid
     values for parameters `n` and `p`, and `x` in `prob` and `log_prob`.
     If `False`, correct behavior is not guaranteed.
@@ -290,7 +291,7 @@ Log probability density function.
 ##### Raises:
 
 
-*  <b>`AttributeError`</b>: if not `is_continuous`.
+*  <b>`TypeError`</b>: if not `is_continuous`.
 
 
 - - -
@@ -314,7 +315,7 @@ Log probability mass function.
 ##### Raises:
 
 
-*  <b>`AttributeError`</b>: if `is_continuous`.
+*  <b>`TypeError`</b>: if `is_continuous`.
 
 
 - - -
@@ -322,6 +323,21 @@ Log probability mass function.
 #### `tf.contrib.distributions.Multinomial.log_prob(value, name='log_prob')` {#Multinomial.log_prob}
 
 Log probability density/mass function (depending on `is_continuous`).
+
+
+Additional documentation from `Multinomial`:
+
+For each batch of counts `[n_1,...,n_k]`, `P[counts]` is the probability
+that after sampling `n` draws from this Multinomial distribution, the
+number of draws falling in class `j` is `n_j`.  Note that different
+sequences of draws can result in the same counts, thus the probability
+includes a combinatorial coefficient.
+
+Note that input "counts" must be a non-negative tensor with dtype `dtype`
+and whose shape can be broadcast with `self.p` and `self.n`.  For fixed
+leading dimensions, the last dimension represents counts for the
+corresponding Multinomial distribution in `self.p`. `counts` is only legal
+if it sums up to `n` and its components are equal to integer values.
 
 ##### Args:
 
@@ -369,7 +385,7 @@ survival function, which are more accurate than `1 - cdf(x)` when `x >> 1`.
 
 #### `tf.contrib.distributions.Multinomial.logits` {#Multinomial.logits}
 
-Log-odds.
+Vector of coordinatewise logits.
 
 
 - - -
@@ -404,7 +420,9 @@ Name prepended to all ops created by this `Distribution`.
 
 #### `tf.contrib.distributions.Multinomial.p` {#Multinomial.p}
 
-Event probabilities.
+Vector of probabilities summing to one.
+
+Each element is the probability of drawing that coordinate.
 
 
 - - -
@@ -477,7 +495,7 @@ Probability density function.
 ##### Raises:
 
 
-*  <b>`AttributeError`</b>: if not `is_continuous`.
+*  <b>`TypeError`</b>: if not `is_continuous`.
 
 
 - - -
@@ -501,7 +519,7 @@ Probability mass function.
 ##### Raises:
 
 
-*  <b>`AttributeError`</b>: if `is_continuous`.
+*  <b>`TypeError`</b>: if `is_continuous`.
 
 
 - - -
@@ -509,6 +527,21 @@ Probability mass function.
 #### `tf.contrib.distributions.Multinomial.prob(value, name='prob')` {#Multinomial.prob}
 
 Probability density/mass function (depending on `is_continuous`).
+
+
+Additional documentation from `Multinomial`:
+
+For each batch of counts `[n_1,...,n_k]`, `P[counts]` is the probability
+that after sampling `n` draws from this Multinomial distribution, the
+number of draws falling in class `j` is `n_j`.  Note that different
+sequences of draws can result in the same counts, thus the probability
+includes a combinatorial coefficient.
+
+Note that input "counts" must be a non-negative tensor with dtype `dtype`
+and whose shape can be broadcast with `self.p` and `self.n`.  For fixed
+leading dimensions, the last dimension represents counts for the
+corresponding Multinomial distribution in `self.p`. `counts` is only legal
+if it sums up to `n` and its components are equal to integer values.
 
 ##### Args:
 

@@ -24,6 +24,7 @@ operators to your graph.
 @@add
 @@sub
 @@mul
+@@scalar_mul
 @@div
 @@truediv
 @@floordiv
@@ -79,6 +80,7 @@ functions on matrices to your graph.
 @@trace
 @@transpose
 
+@@eye
 @@matrix_diag
 @@matrix_diag_part
 @@matrix_band_part
@@ -135,8 +137,11 @@ common math computations that reduce various dimensions of a tensor.
 @@reduce_all
 @@reduce_any
 @@reduce_logsumexp
+@@reduce_nnz
 
 @@accumulate_n
+
+@@einsum
 
 ## Scan
 
@@ -948,44 +953,71 @@ ops.Tensor._override_operator("__gt__", gen_math_ops.greater)
 ops.Tensor._override_operator("__ge__", gen_math_ops.greater_equal)
 
 
-def range(start, limit=None, delta=1, name="range"):
-  """Creates a sequence of integers.
+def range(start, limit=None, delta=1, dtype=None, name="range"):
+  """Creates a sequence of numbers.
 
-  Creates a sequence of integers that begins at `start` and extends by
+  Creates a sequence of numbers that begins at `start` and extends by
   increments of `delta` up to but not including `limit`.
+
+  The dtype of the resulting tensor is inferred from the inputs unless
+  it is provided explicitly.
 
   Like the Python builtin `range`, `start` defaults to 0, so that
   `range(n) = range(0, n)`.
 
   For example:
 
-  ```
+  ```python
   # 'start' is 3
   # 'limit' is 18
   # 'delta' is 3
   tf.range(start, limit, delta) ==> [3, 6, 9, 12, 15]
+
+  # 'start' is 3
+  # 'limit' is 1
+  # 'delta' is -0.5
+  tf.range(start, limit, delta) ==> [3, 2.5, 2, 1.5]
 
   # 'limit' is 5
   tf.range(limit) ==> [0, 1, 2, 3, 4]
   ```
 
   Args:
-    start: A 0-D (scalar) of type `int32`. Acts as first entry in the range if
+    start: A 0-D `Tensor` (scalar). Acts as first entry in the range if
       `limit` is not None; otherwise, acts as range limit and first entry
       defaults to 0.
-    limit: A 0-D (scalar) of type `int32`. Upper limit of sequence,
+    limit: A 0-D `Tensor` (scalar). Upper limit of sequence,
       exclusive. If None, defaults to the value of `start` while the first
       entry of the range defaults to 0.
-    delta: A 0-D `Tensor` (scalar) of type `int32`. Number that increments
+    delta: A 0-D `Tensor` (scalar). Number that increments
       `start`. Defaults to 1.
+    dtype: The type of the elements of the resulting tensor.
     name: A name for the operation. Defaults to "range".
 
   Returns:
-    An 1-D `int32` `Tensor`.
+    An 1-D `Tensor` of type `dtype`.
   """
   if limit is None:
     start, limit = 0, start
-  return gen_math_ops._range(start, limit, delta, name=name)
+
+  with ops.name_scope(name, "Range", [start, limit, delta]) as name:
+    start = ops.convert_to_tensor(start, dtype=dtype, name="start")
+    limit = ops.convert_to_tensor(limit, dtype=dtype, name="limit")
+    delta = ops.convert_to_tensor(delta, dtype=dtype, name="delta")
+
+    # infer dtype if not explicitly provided
+    if dtype is None:
+      dtype_hierarchy = [dtypes.int32, dtypes.int64, dtypes.float32,
+                         dtypes.float64]
+      assert all(arg.dtype in dtype_hierarchy for arg in [start, limit, delta])
+      inferred_dtype = max([arg.dtype for arg in [start, limit, delta]],
+                           key=dtype_hierarchy.index)
+
+      start = cast(start, inferred_dtype)
+      limit = cast(limit, inferred_dtype)
+      delta = cast(delta, inferred_dtype)
+
+    return gen_math_ops._range(start, limit, delta, name=name)
 
 
 @ops.RegisterShape("Range")
@@ -1049,6 +1081,57 @@ def reduce_sum(input_tensor, reduction_indices=None, keep_dims=False,
   return gen_math_ops._sum(input_tensor, _ReductionDims(input_tensor,
                                                         reduction_indices),
                            keep_dims, name=name)
+
+
+def reduce_nnz(input_tensor, reduction_indices=None, keep_dims=False,
+               dtype=dtypes.int32, name=None):
+  """Computes number of nonzero elements across dimensions of a tensor.
+
+  Reduces `input_tensor` along the dimensions given in `reduction_indices`.
+  Unless `keep_dims` is true, the rank of the tensor is reduced by 1 for each
+  entry in `reduction_indices`. If `keep_dims` is true, the reduced dimensions
+  are retained with length 1.
+
+  If `reduction_indices` has no entries, all dimensions are reduced, and a
+  tensor with a single element is returned.
+
+  **NOTE** Floating point comparison to zero is done by exact floating point
+  equality check.  Small values are **not** rounded to zero for purposes of
+  the nonzero check.
+
+  For example:
+
+  ```python
+  # 'x' is [[0, 1, 0]
+  #         [1, 1, 0]]
+  tf.reduce_nnz(x) ==> 3
+  tf.reduce_nnz(x, 0) ==> [1, 2, 0]
+  tf.reduce_nnz(x, 1) ==> [1, 2]
+  tf.reduce_nnz(x, 1, keep_dims=True) ==> [[1], [2]]
+  tf.reduce_nnz(x, [0, 1]) ==> 3
+  ```
+
+  Args:
+    input_tensor: The tensor to reduce. Should be of numeric type, or `bool`.
+    reduction_indices: The dimensions to reduce. If `None` (the default),
+      reduces all dimensions.
+    keep_dims: If true, retains reduced dimensions with length 1.
+    dtype: The output dtype; defaults to `tf.int32`.
+    name: A name for the operation (optional).
+
+  Returns:
+    The reduced tensor.
+  """
+  with ops.name_scope(name, "NNZ", [input_tensor]):
+    input_tensor = ops.convert_to_tensor(input_tensor, name="input_tensor")
+    zero = input_tensor.dtype.as_numpy_dtype()
+    return cast(
+        reduce_sum(
+            # int64 reduction happens on GPU
+            to_int64(gen_math_ops.not_equal(input_tensor, zero)),
+            reduction_indices=reduction_indices,
+            keep_dims=keep_dims),
+        dtype=dtype)
 
 
 def reduce_mean(input_tensor, reduction_indices=None, keep_dims=False,
@@ -1255,7 +1338,7 @@ def reduce_logsumexp(input_tensor, reduction_indices=None, keep_dims=False,
   If `reduction_indices` has no entries, all dimensions are reduced, and a
   tensor with a single element is returned.
 
-  This funciton is more numerically stable than log(sum(exp(input))). It avoids
+  This function is more numerically stable than log(sum(exp(input))). It avoids
   overflows caused by taking the exp of large inputs and underflows caused by
   taking the log of small inputs.
 
@@ -1273,7 +1356,7 @@ def reduce_logsumexp(input_tensor, reduction_indices=None, keep_dims=False,
 
   Args:
     input_tensor: The tensor to reduce. Should have numeric type.
-    reduction_indices: The dimensions to reduce. If `None` (the defaut),
+    reduction_indices: The dimensions to reduce. If `None` (the default),
       reduces all dimensions.
     keep_dims: If true, retains reduced dimensions with length 1.
     name: A name for the operation (optional).
@@ -1296,23 +1379,35 @@ def reduce_logsumexp(input_tensor, reduction_indices=None, keep_dims=False,
 def trace(x, name=None):
   """ Compute the trace of a tensor `x`.
 
-  `trace(x)` returns the sum of along the diagonal.
+  `trace(x)` returns the sum along the main diagonal of each inner-most matrix
+  in x. If x is of rank `k` with shape `[I, J, K, ..., L, M, N]`, then output
+  is a tensor of rank `k-2` with dimensions `[I, J, K, ..., L]` where
+
+  `output[i, j, k, ..., l] = trace(x[i, j, i, ..., l, :, :])`
 
   For example:
 
   ```python
-  # 'x' is [[1, 1],
-  #         [1, 1]]
-  tf.trace(x) ==> 2
+  # 'x' is [[1, 2],
+  #         [3, 4]]
+  tf.trace(x) ==> 5
 
   # 'x' is [[1,2,3],
   #         [4,5,6],
   #         [7,8,9]]
   tf.trace(x) ==> 15
+
+  # 'x' is [[[1,2,3],
+  #          [4,5,6],
+  #          [7,8,9]],
+  #         [[-1,-2,-3],
+  #          [-4,-5,-6],
+  #          [-7,-8,-9]]]
+  tf.trace(x) ==> [15,-15]
   ```
 
   Args:
-    x: 2-D tensor.
+    x: tensor.
     name: A name for the operation (optional).
 
   Returns:
@@ -1320,10 +1415,7 @@ def trace(x, name=None):
   """
   with ops.name_scope(name, "Trace", [x]) as name:
     x = ops.convert_to_tensor(x, name="x")
-    if len(x.get_shape()) != 2:
-      raise ValueError("Expected a tensor with rank 2, rank %d tensor received"
-                       % len(x.get_shape()))
-    return reduce_sum(array_ops.diag_part(x), name=name)
+    return reduce_sum(array_ops.matrix_diag_part(x), [-1], name=name)
 
 
 def matmul(a, b,
@@ -1522,6 +1614,9 @@ def accumulate_n(inputs, shape=None, tensor_dtype=None, name=None):
 
   Optionally, pass `shape` and `tensor_dtype` for shape and type checking,
   otherwise, these are inferred.
+
+  NOTE: This operation is not differentiable and cannot be used if inputs depend
+  on trainable variables. Please use `tf.add_n` for such cases.
 
   For example:
 
